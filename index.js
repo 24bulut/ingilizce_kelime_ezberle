@@ -54,6 +54,14 @@ function listAllWords() {
 
 
 async function programMain() {
+
+    // bir hafta önce eklenen kelimeleri ezberlenmemiş olarak işaretle
+    db.run('UPDATE words SET memorized = 0 WHERE created_at < datetime("now", "-7 day") AND memorized = 0', (err) => {
+        if(err){
+            console.error('Ezberlenmemiş kelimeler güncellenirken bir hata oluştu:', err.message);
+        }
+    });
+
     console.log('-----------------------------------');
     console.log(chalk.yellow('Kelime Ezberleme Uygulaması'));
     console.log(chalk.yellow('1. Kelime Ekle'));
@@ -133,13 +141,13 @@ function startMemorize(){
             if(row){
                 console.log('İngilizce kelime: ' + row.english);
                 rl.question('Türkçe karşılığını tahmin edin: ', (answer) => {
-                    if(answer === row.turkish){
-                        console.log(chalk.green('Tebrikler! Doğru bildiniz. ' + ' | Yandex Translate :  https://translate.yandex.com/?lang=en-tr&text=' + row.english));
+                    if(row.turkish.indexOf(answer) !== -1 && answer.length > 0){
+                        console.log(chalk.green('Tebrikler! Doğru bildiniz. ' + row.turkish + ' | Yandex Translate :  https://translate.yandex.com/?lang=en-tr&text=' + row.english));
                         db.run('UPDATE words SET true_count = true_count + 1 WHERE id = ?', [row.id], (err) => {
                             if(err){
                                 console.error('Doğru bilindi olarak işaretlenirken bir hata oluştu:', err.message);
                             }
-                            if(row.true_count >= 15){
+                            if(row.true_count >= 8){
                                 db.run('UPDATE words SET memorized = 1 WHERE id = ?', [row.id], (err) => {
                                     if(err){
                                         console.error('Kelime ezberlendi olarak işaretlenirken bir hata oluştu:', err.message);

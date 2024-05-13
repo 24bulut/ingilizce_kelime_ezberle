@@ -23,11 +23,42 @@ const rl = readline.createInterface({
 });
 
 
-function programMain() {
+function countWords() {
+
+    db.get('SELECT COUNT(*) AS count FROM words', (err, row) => {
+        if(err){
+            console.error('Kelime sayısı alınırken bir hata oluştu:', err.message);
+        } else {
+            console.log('Şuana kadar eklenen kelime sayısı: ' + row.count);
+        }
+    });
+}
+
+
+function listAllWords() {
+    countWords();
+    console.log('-----------------------------------');
+
+    db.all('SELECT * FROM words', (err, rows) => {
+        if(err){
+            console.error('Kelimeler listelenirken bir hata oluştu:', err.message);
+        } else {
+            rows.forEach((row) => {
+                console.log('İngilizce: ' + row.english + ' | Türkçe: ' + row.turkish + ' | Doğru Sayısı: ' + row.true_count + ' | Yanlış Sayısı: ' + row.false_count + ' | Ezberlendi mi? ' + (row.memorized ? chalk.green('Evet') : chalk.red('Hayır')));
+            });
+        }
+        programMain();
+    });
+
+}
+
+
+async function programMain() {
     console.log('-----------------------------------');
     console.log(chalk.yellow('Kelime Ezberleme Uygulaması'));
     console.log(chalk.yellow('1. Kelime Ekle'));
     console.log(chalk.yellow('2. Kelime Ezberlemeye Başla'));
+    console.log(chalk.yellow('3. Tüm Kelimeleri Listele'));
     rl.question('Seçenek: ', (option) => {
         switch (option) {
             case '1':
@@ -40,6 +71,16 @@ function programMain() {
                 startMemorize();
 
                 break;
+            case '3':
+                console.log('Tüm kelimeler listelenecek.');
+                listAllWords();
+
+                break;
+            case 'exit':
+                console.log('Çıkış yapılıyor.');
+                rl.close();
+                db.close();
+                break;
             default:
                 console.log('Geçersiz seçenek.');
                 programMain();
@@ -51,18 +92,33 @@ function programMain() {
 }
 
 function addWord() {
+    console.log('-----------------------------------');
     rl.question('İngilizce kelimeyi girin: ', (englishWord) => {
-        rl.question('Türkçe karşılığını girin: ', (turkishWord) => {
-            db.run('INSERT INTO words (english, turkish) VALUES (?, ?)', [englishWord, turkishWord], (err) => {
-                if (err) {
-                    console.error('Kelime eklenirken bir hata oluştu:', err.message);
-                } else {
-                    console.log('Kelime başarıyla eklendi.');
-                }
-                addWord();
 
-            });
+        db.get('SELECT * FROM words WHERE english = ?', [englishWord], (err, row) => {
+            if (err) {
+                console.error('Kelime sorgulanırken bir hata oluştu:', err.message);
+            } else {
+                if (row) {
+                    console.log(chalk.red('Bu kelime zaten ekli.'));
+                    addWord();
+                } else {
+                    rl.question('Türkçe karşılığını girin: ', (turkishWord) => {
+                        db.run('INSERT INTO words (english, turkish) VALUES (?, ?)', [englishWord, turkishWord], (err) => {
+                            if (err) {
+                                console.error('Kelime eklenirken bir hata oluştu:', err.message);
+                            } else {
+                                console.log(chalk.green('Kelime başarıyla eklendi.'));
+                            }
+                            addWord();
+            
+                        });
+                    });
+                }
+            }
         });
+
+
     });
 }
 
@@ -83,7 +139,7 @@ function startMemorize(){
                             if(err){
                                 console.error('Doğru bilindi olarak işaretlenirken bir hata oluştu:', err.message);
                             }
-                            if(row.true_count >= 5){
+                            if(row.true_count >= 15){
                                 db.run('UPDATE words SET memorized = 1 WHERE id = ?', [row.id], (err) => {
                                     if(err){
                                         console.error('Kelime ezberlendi olarak işaretlenirken bir hata oluştu:', err.message);
